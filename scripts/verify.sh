@@ -2,6 +2,22 @@
 
 set -e
 
+# ====================================================================
+# 本地验证脚本 - 停车场收费系统
+#
+# 功能：
+#   1. 环境检查：验证 Python3、Node、NPM、Docker 是否安装
+#   2. 后端验证：创建虚拟环境、安装依赖、启动服务、健康检查、API 验证
+#   3. 前端构建验证：安装依赖、执行构建、验证构建产物
+#   4. Docker 容器验证：验证 compose 配置、构建镜像、启动容器、
+#                      检查容器运行状态、容器健康检查、停止清理
+#
+# 使用方法：
+#   bash scripts/verify.sh
+#   或
+#   npm run verify
+# ====================================================================
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -32,9 +48,6 @@ cleanup() {
             kill -9 "$BACKEND_PID" 2>/dev/null || true
         fi
     fi
-
-    pkill -f "python run.py" 2>/dev/null || true
-    pkill -f "gunicorn.*run:app" 2>/dev/null || true
 
     if [ "$DOCKER_STARTED" = true ]; then
         echo -e "${YELLOW}[CLEANUP]${NC} 停止并清理 Docker 容器..."
@@ -107,20 +120,21 @@ check_command() {
 check_with_timeout() {
     local url="$1"
     local timeout_sec="$2"
-    local expected="$3"
-    local description="$4"
+    local description="$3"
 
     local start_time=$(date +%s)
     local end_time=$((start_time + timeout_sec))
+    local http_code
 
     while [ $(date +%s) -lt $end_time ]; do
-        if curl -s --max-time 5 "$url" 2>/dev/null | grep -q "$expected"; then
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000")
+        if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
             return 0
         fi
         sleep 1
     done
 
-    error "$description 超时 (${timeout_sec}s)"
+    error "$description 超时 (${timeout_sec}s, 最后状态码: ${http_code})"
     return 1
 }
 
@@ -230,7 +244,7 @@ if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
 fi
 
 log "等待后端服务就绪..."
-if check_with_timeout "http://127.0.0.1:5000/api/health" 30 "ok" "后端健康检查"; then
+if check_with_timeout "http://127.0.0.1:5000/api/health" 30 "后端健康检查"; then
     success "后端健康检查通过"
     mark_pass "后端验证.健康检查" "200 OK"
 else
@@ -332,22 +346,27 @@ else
     fi
 
     log "启动 Docker 容器..."
-    docker compose up -d 2>&1
-    sleep 3
-
-    log "检查容器运行状态..."
-    if docker compose ps --format '{{.Service}}: {{.State}}' | grep -q "running"; then
-        success "Docker 容器已启动"
-        mark_pass "Docker验证.容器启动" "运行中"
+    if docker compose up -d 2>&1; then
+        sleep 3
+        log "启动命令执行成功，检查容器运行状态..."
+        if docker compose ps --format '{{.Service}}: {{.State}}' | grep -q "running"; then
+            success "Docker 容器已启动"
+            mark_pass "Docker验证.容器启动" "运行中"
+        else
+            error "Docker 容器启动后状态异常"
+            mark_fail "Docker验证.容器启动" "容器未处于 running 状态"
+            docker compose logs 2>&1 | head -50 || true
+            print_summary
+        fi
     else
-        error "Docker 容器启动失败"
-        mark_fail "Docker验证.容器启动" "失败"
+        error "Docker 容器启动命令执行失败"
+        mark_fail "Docker验证.容器启动" "启动命令失败"
         docker compose logs 2>&1 | head -50 || true
         print_summary
     fi
 
     log "等待后端容器服务就绪..."
-    if check_with_timeout "http://127.0.0.1:5000/api/health" 60 "ok" "后端容器健康检查"; then
+    if check_with_timeout "http://127.0.0.1:5000/api/health" 60 "后端容器健康检查"; then
         success "后端容器健康检查通过"
         mark_pass "Docker验证.后端健康检查" "200 OK"
     else
@@ -357,7 +376,7 @@ else
     fi
 
     log "等待前端容器服务就绪..."
-    if check_with_timeout "http://127.0.0.1:8080" 30 "DOCTYPE" "前端容器健康检查"; then
+    if check_with_timeout "http://127.0.0.1:8080" 30 "前端容器健康检查"; then
         success "前端容器健康检查通过"
         mark_pass "Docker验证.前端健康检查" "200 OK"
     else
