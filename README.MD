@@ -73,14 +73,6 @@ npm run docker:down
 
 访问 `http://127.0.0.1:8080`。前端 Nginx 会将 `/api` 代理到后端 Flask 服务。
 
-## Docker Compose 启动
-
-```bash
-docker compose up --build
-```
-
-访问 `http://127.0.0.1:8080`。前端 Nginx 会将 `/api` 代理到后端 Flask 服务。
-
 ## 验证接口
 
 ```bash
