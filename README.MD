@@ -30,27 +30,48 @@ frontend/
 docker-compose.yml
 ```
 
+## 一键本地验证
+
+运行以下命令即可完成后端检查、前端构建和 Docker 配置验证：
+
+```bash
+npm run verify
+```
+
+该命令会自动完成：
+1. **后端验证**：创建虚拟环境、安装依赖、启动服务、检查健康接口和 API 接口
+2. **前端构建验证**：安装依赖、构建前端、验证构建产物
+3. **Docker 配置验证**：验证 docker-compose.yml 和 Dockerfile 配置
+
 ## 本地开发
 
 后端：
 
 ```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python run.py
+npm run start:backend
 ```
 
 前端：
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run start:frontend
 ```
 
 访问 `http://127.0.0.1:5173`，后端接口为 `http://127.0.0.1:5000/api`。
+
+## Docker 启动
+
+```bash
+npm run docker:up
+```
+
+停止：
+
+```bash
+npm run docker:down
+```
+
+访问 `http://127.0.0.1:8080`。前端 Nginx 会将 `/api` 代理到后端 Flask 服务。
 
 ## Docker Compose 启动
 

@@ -1,0 +1,12 @@
+{
+  "name": "parking-system",
+  "version": "1.0.0",
+  "description": "停车场收费系统 - 基于 Flask + Vue",
+  "scripts": {
+    "verify": "bash scripts/verify.sh",
+    "start:backend": "cd backend && source .venv/bin/activate && python run.py",
+    "start:frontend": "cd frontend && npm run dev",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  }
+}
